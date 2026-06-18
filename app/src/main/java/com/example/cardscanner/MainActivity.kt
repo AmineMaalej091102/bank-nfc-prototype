@@ -1,6 +1,7 @@
 package com.example.cardscanner
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
@@ -57,56 +58,108 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         val isoDep = IsoDep.get(tag) ?: return
         try {
             isoDep.connect()
-            updateUiConnecting()
+            isoDep.timeout = 4000
+            updateUiState("#EAB308", "🔄", "Reading Chip Data Safely...")
 
-            // 1. SELECT PPSE Command (Proximity Payment System Environment)
-            // This queries the chip to discover the location path of the master financial app
-            val selectPpseCmd = hexStringToByteArray("00A404000E325041592E5359532E444446303100")
-            val response = isoDep.transceive(selectPpseCmd)
+            // 1. Link our custom physical channel interface
+            val provider = NfcProvider(isoDep)
 
-            val hexResponse = byteArrayToHexString(response)
+            // 2. Configure the official EMV Template properties
+            val config = com.github.devnied.emvnfccard.parser.EmvTemplate.Config()
+                .setContactLess(true)
+                .setReadAllAids(true)
+                .setReadTransactions(true)
+                .setRemoveDefaultParsers(false)
+                .setReadAt(true)
 
-            // Validate response ending status bytes (9000 = Success OK)
-            if (hexResponse.endsWith("9000")) {
-                val parsedTags = mutableMapOf<String, String>()
-                parseTLV(hexResponse, parsedTags)
+            // 3. Initialize using the correct official Builder engine matching your library version
+            val parser = com.github.devnied.emvnfccard.parser.EmvTemplate.Builder()
+                .setProvider(provider)
+                .setConfig(config)
+                .build()
 
-                // EMV standard fields: Tag 4F = AID, Tag 50 = Application Label String
-                val extractedAid = parsedTags["4F"] ?: "A0000000031010" // Default fallback to Visa standard
-                val cardLabelText = parsedTags["50"] ?.let { hexToString(it)} ?: "Standard Bank Card"
+            // 4. Execute the dynamic card extraction task
+            val cardData = parser.readEmvCard()
 
-                // 2. Read Internal Records using the discovered AID profile
-                // This builds the precise dynamic log stack to pipe into a terminal/SoftPOS environment
-                val selectAidCmd = hexStringToByteArray("00A40400" + String.format("%02X", extractedAid.length / 2) + extractedAid + "00")
-                val aidResponse = isoDep.transceive(selectAidCmd)
-                val hexAidResponse = byteArrayToHexString(aidResponse)
+            if (cardData != null) {
+                // Java library properties are cleanly exposed via getters/setters
+                // Safely grab the first primary application profile found on the chip
+                val primaryApp = cardData.applications?.firstOrNull()
 
-                val detailedTags = mutableMapOf<String, String>()
-                parseTLV(hexAidResponse, detailedTags)
+                val aidStr = primaryApp?.aid ?: "N/A"
+                val networkLabel = cardData.type?.name ?: "Contactless Card"
+                val panNumber = cardData.cardNumber ?: "•••• •••• •••• ••••"
+
+                val dateObject = cardData.expireDate
+                val formattedDate = if (dateObject != null) {
+                    val sdf = java.text.SimpleDateFormat("MM/yy", java.util.Locale.US)
+                    sdf.format(dateObject)
+                } else {
+                    "••/••"
+                }
 
                 runOnUiThread {
-                    statusCard.setCardBackgroundColor("#198754".toColorInt())// Success Green
-                    statusEmoji.text = "✅"
-                    statusText.text = "Card Read Complete!"
-                    txtAid.text = "Application ID (AID): $extractedAid"
-                    txtLabel.text = "Card Network: $cardLabelText"
+                    this@MainActivity.statusCard.setCardBackgroundColor(Color.parseColor("#16A34A"))
+                    this@MainActivity.statusEmoji.text = "✅"
+                    this@MainActivity.statusText.text = "Card Parsed Successfully!"
 
-                    // Render out the dynamic layout block containing the TLV structure
+                    this@MainActivity.txtAid.text = "Application ID (AID): $aidStr"
+                    this@MainActivity.txtLabel.text = "Network: $networkLabel"
+
                     val displayBuilder = StringBuilder()
-                    detailedTags.forEach { (tag, value) -> displayBuilder.append("Tag [").append(tag).append("] | Len: ").append(value.length / 2)
-                        .append("\n└─ Value: ").append(value).append("\n\n")
-                    }
-                    txtTlvOutput.text = displayBuilder.toString()
+                    displayBuilder.append("💳 ACCOUNT INFORMATION (PARSED)\n")
+                    displayBuilder.append("├─ PAN: ").append(panNumber).append("\n")
+                    displayBuilder.append("└─ EXPIRY: ").append(formattedDate).append("\n\n")
+
+                    displayBuilder.append("⚙️ EMV TECHNICAL PARAMETERS\n")
+                    displayBuilder.append("├─ Card Scheme: ").append(cardData.type?.let { it.name } ?: "Unknown").append("\n")
+                    displayBuilder.append("├─ Application Label: ").append(primaryApp?.applicationLabel ?: "None").append("\n")
+                    displayBuilder.append("└─ BIC: ").append(cardData.bic ?: "Not Provided").append("\n")
+
+                    this@MainActivity.txtTlvOutput.text = displayBuilder.toString()
                 }
             } else {
-                showUiError("Unsupported Card Type")
+                updateUiState("#DC2626", "❌", "Failed to parse EMV structure.")
             }
-        } catch (_: Exception) {
-            showUiError("Card lost too fast. Try again!")
+        } catch (e: Exception) {
+            updateUiState("#DC2626", "❌", "Card moved too fast or communication failed.")
         } finally {
-            try { isoDep.close() } catch (_: Exception) {}
+            try { isoDep.close() } catch (ignored: Exception) {}
         }
     }
+
+
+
+    // Helper Function: Parses raw PDOL structures to calculate expected terminal input sizes
+    private fun calculateDolLength(pdolHex: String): Int {
+        var i = 0
+        var totalLength = 0
+        while (i < pdolHex.length) {
+            var tag = pdolHex.substring(i, i + 2)
+            i += 2
+            val firstByte = tag.toInt(16)
+            if ((firstByte and 0x1F) == 0x1F) {
+                tag += pdolHex.substring(i, i + 2)
+                i += 2
+            }
+            if (i >= pdolHex.length) break
+            val lenStr = pdolHex.substring(i, i + 2)
+            i += 2
+            totalLength += lenStr.toInt(16)
+        }
+        return if (totalLength == 0) 4 else totalLength
+    }
+
+
+
+    private fun updateUiState(colorHex: String, emoji: String, prompt: String) {
+        runOnUiThread {
+            statusCard.setCardBackgroundColor(Color.parseColor(colorHex))
+            statusEmoji.text = emoji
+            statusText.text = prompt
+        }
+    }
+
 
     // Non-blocking recursive execution logic to dissect the raw-length-value packets
     private fun parseTLV(hex: String, map: MutableMap<String, String>) {

@@ -45,4 +45,6 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    // ADDED: Imports the L2 EMV parser library
+    implementation(libs.emv.paycard.reader)
 }
