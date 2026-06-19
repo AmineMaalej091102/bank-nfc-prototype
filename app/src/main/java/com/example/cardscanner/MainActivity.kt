@@ -1,16 +1,15 @@
 package com.example.cardscanner
 
 import android.annotation.SuppressLint
-import android.graphics.Color
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.os.Bundle
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.toColorInt
 import com.google.android.material.card.MaterialCardView
 import java.util.Locale
-import androidx.core.graphics.toColorInt
 
 class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
@@ -86,20 +85,23 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 // Safely grab the first primary application profile found on the chip
                 val primaryApp = cardData.applications?.firstOrNull()
 
-                val aidStr = primaryApp?.aid ?: "N/A"
+                // Converts the raw memory byte array into a clean hex string
+                val rawAidBytes = primaryApp?.aid
+                val aidStr = rawAidBytes?.joinToString("") { String.format("%02X", it) } ?: "N/A"
+
                 val networkLabel = cardData.type?.name ?: "Contactless Card"
                 val panNumber = cardData.cardNumber ?: "•••• •••• •••• ••••"
 
                 val dateObject = cardData.expireDate
                 val formattedDate = if (dateObject != null) {
-                    val sdf = java.text.SimpleDateFormat("MM/yy", java.util.Locale.US)
+                    val sdf = java.text.SimpleDateFormat("MM/yy", Locale.US)
                     sdf.format(dateObject)
                 } else {
                     "••/••"
                 }
 
                 runOnUiThread {
-                    this@MainActivity.statusCard.setCardBackgroundColor(Color.parseColor("#16A34A"))
+                    this@MainActivity.statusCard.setCardBackgroundColor("#16A34A".toColorInt())
                     this@MainActivity.statusEmoji.text = "✅"
                     this@MainActivity.statusText.text = "Card Parsed Successfully!"
 
@@ -112,7 +114,7 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     displayBuilder.append("└─ EXPIRY: ").append(formattedDate).append("\n\n")
 
                     displayBuilder.append("⚙️ EMV TECHNICAL PARAMETERS\n")
-                    displayBuilder.append("├─ Card Scheme: ").append(cardData.type?.let { it.name } ?: "Unknown").append("\n")
+                    displayBuilder.append("├─ Card Scheme: ").append(cardData.type?.name ?: "Unknown").append("\n")
                     displayBuilder.append("├─ Application Label: ").append(primaryApp?.applicationLabel ?: "None").append("\n")
                     displayBuilder.append("└─ BIC: ").append(cardData.bic ?: "Not Provided").append("\n")
 
@@ -121,40 +123,17 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             } else {
                 updateUiState("#DC2626", "❌", "Failed to parse EMV structure.")
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             updateUiState("#DC2626", "❌", "Card moved too fast or communication failed.")
         } finally {
-            try { isoDep.close() } catch (ignored: Exception) {}
+            try { isoDep.close() } catch (_: Exception) {}
         }
     }
-
-
-
-    // Helper Function: Parses raw PDOL structures to calculate expected terminal input sizes
-    private fun calculateDolLength(pdolHex: String): Int {
-        var i = 0
-        var totalLength = 0
-        while (i < pdolHex.length) {
-            var tag = pdolHex.substring(i, i + 2)
-            i += 2
-            val firstByte = tag.toInt(16)
-            if ((firstByte and 0x1F) == 0x1F) {
-                tag += pdolHex.substring(i, i + 2)
-                i += 2
-            }
-            if (i >= pdolHex.length) break
-            val lenStr = pdolHex.substring(i, i + 2)
-            i += 2
-            totalLength += lenStr.toInt(16)
-        }
-        return if (totalLength == 0) 4 else totalLength
-    }
-
 
 
     private fun updateUiState(colorHex: String, emoji: String, prompt: String) {
         runOnUiThread {
-            statusCard.setCardBackgroundColor(Color.parseColor(colorHex))
+            statusCard.setCardBackgroundColor(colorHex.toColorInt())
             statusEmoji.text = emoji
             statusText.text = prompt
         }
@@ -204,46 +183,4 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    @SuppressLint("SetTextI18n")
-    private fun updateUiConnecting() {
-        runOnUiThread {
-            statusCard.setCardBackgroundColor("#FFC107".toColorInt()) // Warning Yellow
-            statusEmoji.text = "\uD83D\uDD04"
-            statusText.text = "Reading Chip Data... Do Not Move Card"
-        }
-    }
-
-    private fun showUiError(message: String) {
-        runOnUiThread {
-            statusCard.setCardBackgroundColor("#DC3545".toColorInt()) // Danger Red
-            statusEmoji.text = "❌"
-            statusText.text = message
-        }
-    }
-
-    private fun hexStringToByteArray(s: String): ByteArray {
-        val len = s.length
-        val data = ByteArray(len / 2)
-        var i = 0
-        while (i < len) {
-            data[i / 2] = ((Character.digit(s[i], 16) shl 4) + Character.digit(s[i + 1], 16)).toByte()
-            i += 2
-        }
-        return data
-    }
-
-    private fun byteArrayToHexString(bytes: ByteArray): String {
-     return bytes.joinToString("") { String.format("%02X", it) }
-    }
-
-    private fun hexToString(hex: String): String {
-        val output = StringBuilder()
-        var i = 0
-        while (i < hex.length) {
-            val str = hex.substring(i, i + 2)
-            output.append(str.toInt(16).toChar())
-            i += 2
-        }
-        return output.toString()
-    }
 }
