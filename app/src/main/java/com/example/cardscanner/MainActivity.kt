@@ -86,7 +86,14 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 // Safely grab the first primary application profile found on the chip
                 val primaryApp = cardData.applications?.firstOrNull()
 
-                val aidStr = primaryApp?.aid ?: "N/A"
+                // Converts the raw memory byte array into a clean hex string
+                val rawAidBytes = primaryApp?.aid
+                val aidStr = if (rawAidBytes != null) {
+                    rawAidBytes.joinToString("") { String.format("%02X", it) }
+                } else {
+                    "N/A"
+                }
+
                 val networkLabel = cardData.type?.name ?: "Contactless Card"
                 val panNumber = cardData.cardNumber ?: "•••• •••• •••• ••••"
 
