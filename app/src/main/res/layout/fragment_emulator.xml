@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://android.com"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#0F172A">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="130dp"
+        app:cardCornerRadius="20dp"
+        app:cardBackgroundColor="#0284C7"
+        app:strokeWidth="0dp"
+        android:layout_marginBottom="16dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📶" android:textSize="32sp" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="EMULATOR READY TO PUSH" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" android:gravity="center" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:id="@+id/txtActiveAid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ACTIVE AID: A0000000041010"
+        android:textColor="#38BDF8"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:fontFamily="monospace"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnWipeData"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="🔄 CLEAR SAVED EMV DATA"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#DC2626"
+        app:cardCornerRadius="16dp"/>
+</LinearLayout>

@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Card Scanner</string>
+    <string name="hold_card_to_back_of_phone">HOLD CARD TO BACK OF PHONE</string>
+    <string name="active_emv_aid_waiting">ACTIVE EMV AID: Waiting...</string>
+    <string name="card_network_waiting">Card Network: Waiting...</string>
+    <string name="no_data_blocks_parsed_yet">No data blocks parsed yet.</string>
+    <string name="reset_core_data">🔄 RESET CORE DATA</string>
 </resources>
