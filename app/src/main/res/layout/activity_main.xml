@@ -7,7 +7,7 @@
     android:background="#0F172A"
     android:padding="20dp">
 
-    <!-- Status Header -->
+    <!-- 1. Top Sensor Status Card View -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/statusCard"
         android:layout_width="match_parent"
@@ -26,10 +26,54 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Scrollable Area for Decoded Tags -->
+    <!-- 2. THE FIRST CARD: COMPRESSED DATA MODULE (TAG 4F - COLON-HEX AID) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/firstCompressedCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:cardCornerRadius="16dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:strokeWidth="0dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="COMPRESSED APPLICATION MASTER ID (AID)"
+                android:textColor="#475569"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.04"/>
+
+            <!-- POLISHED UX: Removed default value text, reduced size to 16sp, forced single line -->
+            <TextView
+                android:id="@+id/txtFirstCardValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#0284C7"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:layout_marginTop="6dp"
+                android:singleLine="true"
+                android:ellipsize="none"
+                android:gravity="center"/>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- 3. Scrollable List Workspace Grid Area -->
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginBottom="12dp">
         <LinearLayout
             android:id="@+id/tlvContainer"
             android:layout_width="match_parent"

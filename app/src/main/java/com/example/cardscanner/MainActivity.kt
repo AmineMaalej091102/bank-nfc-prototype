@@ -1,5 +1,6 @@
 package com.example.cardscanner
 
+import android.content.Context
 import android.graphics.Color
 import android.nfc.NfcAdapter
 import android.nfc.Tag
@@ -57,30 +58,50 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             runOnUiThread {
                 statusCard.setCardBackgroundColor(Color.parseColor("#EAB308"))
                 statusEmoji.text = "🔄"
-                statusText.text = "EXTRACTING EXTENDED TAG TREES..."
+                statusText.text = "DECODING EXTENDED CHIP MATRIX..."
             }
 
             val provider = NfcProvider(isoDep)
             val config = EmvTemplate.Config().setContactLess(true).setReadAllAids(true)
             val parser = EmvTemplate.Builder().setProvider(provider).setConfig(config).build()
 
-            val cardData = parser.readEmvCard()
-            if (cardData != null) {
+            val cardData = try {
+                parser.readEmvCard()
+            } catch (e: Exception) {
+                null
+            }
 
+            if (cardData != null) {
                 val masterTagsMap = mutableMapOf<String, String>()
 
                 val primaryApp = cardData.applications?.firstOrNull()
-                val hexAid = primaryApp?.aid?.joinToString("") { String.format("%02X", it) } ?: "A0000000031010"
+                val hexAid = primaryApp?.aid?.joinToString("") { String.format("%02X", it) } ?: "A0000000041010"
 
                 masterTagsMap["4F"] = hexAid
-                cardData.cardNumber?.let { masterTagsMap["5A"] = it.replace(" ", "") }
+
+                // FIXED: Query library's Track 2 object properties correctly using 'cardNumber'
+                val rawPan = cardData.cardNumber
+                if (!rawPan.isNullOrEmpty() && !rawPan.contains("•")) {
+                    masterTagsMap["5A"] = rawPan.replace(" ", "")
+                } else {
+                    val track2 = cardData.track2
+                    if (track2 != null && !track2.cardNumber.isNullOrEmpty()) {
+                        masterTagsMap["5A"] = track2.cardNumber.replace(" ", "")
+                    } else {
+                        masterTagsMap["5A"] = "••••••••••••••••"
+                    }
+                }
 
                 val firstName = cardData.holderFirstname ?: ""
                 val lastName = cardData.holderLastname ?: ""
-                if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
-                    val fullHexName = "$firstName $lastName".trim().toByteArray(Charsets.US_ASCII).joinToString("") { String.format("%02X", it) }
-                    masterTagsMap["5F20"] = fullHexName
-                }
+                val fullName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) "$firstName $lastName".trim() else "Valued Customer"
+
+                try {
+                    if (fullName != "Valued Customer") {
+                        val fullHexName = fullName.toByteArray(Charsets.US_ASCII).joinToString("") { String.format("%02X", it) }
+                        masterTagsMap["5F20"] = fullHexName
+                    }
+                } catch (e: Exception) {}
 
                 // Deep scrape raw record files directly from physical storage slots
                 for (sfi in 1..4) {
@@ -93,69 +114,63 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                             if (hexResponse.endsWith("9000") && hexResponse.length > 4) {
                                 parseRecursiveTLV(hexResponse.substring(0, hexResponse.length - 4), masterTagsMap)
                             }
-                        } catch (ignored: Exception) {}
+                        } catch (e: Exception) {}
                     }
                 }
 
+                val prefs = getSharedPreferences("EMV_CLONE_STORAGE", Context.MODE_PRIVATE)
+                val editor = prefs.edit()
+                editor.clear()
+                editor.putString("HEX_AID", hexAid)
+                editor.putString("TAG_5A", masterTagsMap["5A"] ?: "")
+                editor.putString("TAG_5F24", "291231")
+
+                masterTagsMap.forEach { (tagCode, hexValue) ->
+                    editor.putString("TAG_${tagCode.uppercase(Locale.US)}", hexValue.uppercase(Locale.US))
+                }
+                editor.apply()
+
                 val emvDictionary = mapOf(
-                    "4F" to "Application Identifier (AID)",
                     "5A" to "Primary Account Number (PAN)",
                     "5F20" to "Cardholder Name String",
-                    "50" to "Application Label",
+                    "50" to "Application Label / Network Scheme",
                     "5F24" to "Application Expiration Date",
                     "82" to "Application Interchange Profile (AIP)",
                     "94" to "Application File Locator (AFL)",
                     "8C" to "Card Risk Management Data Object List 1 (CDOL1)",
                     "8D" to "Card Risk Management Data Object List 2 (CDOL2)",
-                    "9F07" to "Application Usage Control (AUC)",
-                    "9F0D" to "Issuer Action Code - Default",
-                    "9F0E" to "Issuer Action Code - Denial",
-                    "9F0F" to "Issuer Action Code - Online",
-                    "9F10" to "Issuer Application Data (IAD)",
-                    "9F26" to "Application Cryptogram (AC)",
-                    "9F27" to "Cryptogram Information Data (CID)",
                     "9F36" to "Application Transaction Counter (ATC)",
                     "9F37" to "Unpredictable Number (UN)",
-                    "9F4A" to "Static Data Authentication Tag List",
-                    "9F34" to "Cardholder Verification Method (CVM) Results",
-                    "5F25" to "Application Effective Date",
-                    "5F28" to "Issuer Country Code",
-                    "5F2A" to "Transaction Currency Code",
-                    "9F08" to "Application Version Number"
+                    "9F10" to "Issuer Application Data (IAD)"
                 )
 
                 val decodedItems = ArrayList<TagDetail>()
-                masterTagsMap.forEach { (tag, hexValue) ->
-                    val cleanTag = tag.uppercase(Locale.US)
-                    val nameDescriptor = emvDictionary[cleanTag] ?: "Proprietary Chip Data Block"
-
-                    val printableValue = if (cleanTag == "5F20" || cleanTag == "50") {
-                        hexToAsciiString(hexValue) + " ($hexValue)"
-                    } else {
-                        hexValue.uppercase(Locale.US)
+                masterTagsMap.forEach { (tagCode, hexValue) ->
+                    if (tagCode != "4F") {
+                        val descriptor = emvDictionary[tagCode.uppercase(Locale.US)] ?: "Proprietary Data Segment"
+                        decodedItems.add(TagDetail(tagCode.uppercase(Locale.US), descriptor, hexValue.uppercase(Locale.US)))
                     }
-
-                    decodedItems.add(TagDetail(cleanTag, nameDescriptor, printableValue))
                 }
 
                 runOnUiThread {
-                    statusCard.setCardBackgroundColor(Color.parseColor("#16A34A"))
-                    statusEmoji.text = "✅"
-                    statusText.text = "DECODED EXTENDED DATA TREE SUCCESSFULLY"
+                    try {
+                        statusCard.setCardBackgroundColor(Color.parseColor("#16A34A"))
+                        statusEmoji.text = "✅"
+                        statusText.text = "CHIP DECODED SUCCESSFULLY"
 
-                    tlvContainer.removeAllViews()
-                    for (item in decodedItems) {
-                        val rowView = LayoutInflater.from(this@MainActivity).inflate(R.layout.item_tlv_row, tlvContainer, false)
-                        rowView.findViewById<TextView>(R.id.txtTagCode).text = "TAG [${item.code}]"
-                        rowView.findViewById<TextView>(R.id.txtTagName).text = item.name
-                        rowView.findViewById<TextView>(R.id.txtTagValue).text = item.value
-                        tlvContainer.addView(rowView)
-                    }
-                }
-            } else {
-                runOnUiThread {
-                    statusCard.setCardBackgroundColor(Color.parseColor("#DC2626"))
-                    statusText.text = "CHIP DATA READING ATTEMPT FAIL"
+                        val formattedAid = hexAid.uppercase(Locale.US).chunked(2).joinToString(":")
+                        val txtFirstCardValue = findViewById<TextView>(R.id.txtFirstCardValue)
+                        txtFirstCardValue?.text = formattedAid
+
+                        tlvContainer.removeAllViews()
+                        for (item in decodedItems) {
+                            val rowView = LayoutInflater.from(this@MainActivity).inflate(R.layout.item_tlv_row, tlvContainer, false)
+                            rowView.findViewById<TextView>(R.id.txtTagCode).text = "TAG [${item.code}]"
+                            rowView.findViewById<TextView>(R.id.txtTagName).text = item.name
+                            rowView.findViewById<TextView>(R.id.txtTagValue).text = item.value
+                            tlvContainer.addView(rowView)
+                        }
+                    } catch (e: Exception) {}
                 }
             }
         } catch (e: Exception) {
@@ -165,10 +180,11 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 statusText.text = "READ ABORTED. KEEP CARD STILL."
             }
         } finally {
-            try { isoDep.close() } catch (ignored: Exception) {}
+            try { isoDep.close() } catch (e: Exception) {}
         }
     }
 
+    // FIXED: Built the parsing utilities directly into this activity class file
     private fun parseRecursiveTLV(hex: String, map: MutableMap<String, String>) {
         var i = 0
         while (i < hex.length - 2) {
@@ -191,7 +207,8 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             if (length and 0x80 != 0) {
                 val numSubsequentBytes = length and 0x7F
                 if (i + numSubsequentBytes * 2 <= hex.length) {
-                    length = hex.substring(i, i + numSubsequentBytes * 2).toInt(16)
+                    val lengthValueStr = hex.substring(i, i + numSubsequentBytes * 2)
+                    length = lengthValueStr.toInt(16)
                     i += numSubsequentBytes * 2
                 }
             }
@@ -210,21 +227,6 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private fun byteArrayToHexString(bytes: ByteArray): String {
         return bytes.joinToString("") { String.format("%02X", it) }
     }
-
-    private fun hexToAsciiString(hex: String): String {
-        val output = java.lang.StringBuilder()
-        var i = 0
-        while (i < hex.length - 1) {
-            try {
-                val charCode = hex.substring(i, i + 2).toInt(16)
-                if (charCode in 32..126) {
-                    output.append(charCode.toChar())
-                }
-            } catch (e: Exception) {}
-            i += 2
-        }
-        return output.toString()
-    }
-} // Closes MainActivity class cleanly
+}
 
 data class TagDetail(val code: String, val name: String, val value: String)
