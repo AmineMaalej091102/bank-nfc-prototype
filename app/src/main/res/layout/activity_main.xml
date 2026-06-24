@@ -7,77 +7,66 @@
     android:background="#0F172A"
     android:padding="20dp">
 
-    <!-- 1. Top Sensor Status Card View -->
+    <!-- 1. Sensor Status Header -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/statusCard"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="100dp"
         app:cardCornerRadius="20dp"
         app:cardBackgroundColor="#1E293B"
         app:strokeWidth="0dp"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="12dp">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:gravity="center">
-            <TextView android:id="@+id/statusEmoji" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🛰️" android:textSize="28sp" />
-            <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ANTENNA ARMED: HOLD CARD TO BACK" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:gravity="center" android:layout_marginTop="4dp"/>
+            <TextView android:id="@+id/statusEmoji" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🛰️" android:textSize="24sp" />
+            <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ANTENNA ARMED: HOLD CARD TO BACK" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:gravity="center" android:layout_marginTop="2dp"/>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 2. THE FIRST CARD: COMPRESSED DATA MODULE (TAG 4F - COLON-HEX AID) -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/firstCompressedCard"
+    <!-- 2. HIGH-UX POLISHED MATERIAL SEARCH BOX FILTER LAYER -->
+    <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        app:cardCornerRadius="16dp"
-        app:cardBackgroundColor="#FFFFFF"
-        app:strokeWidth="0dp">
-        <LinearLayout
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="20dp"
+        app:endIconMode="clear_text"
+        app:endIconTint="#94A3B8"
+        app:boxStrokeWidth="0dp"
+        app:boxStrokeWidthFocused="0dp"
+        app:hintEnabled="false"
+        app:expandedHintEnabled="false">
+
+        <!-- VISIBILITY OPTIMIZED: Height expanded to 60dp, text enlarged to 15sp for a punchier presence -->
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/searchFilterBar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:gravity="center">
+            android:layout_height="60dp"
+            android:background="@drawable/search_input_background"
+            android:hint="🔍 Search by Tag ID or Name (e.g. 5A, PAN, AID)..."
+            android:textColorHint="#64748B"
+            android:textColor="#F8FAFC"
+            android:textSize="15sp"
+            android:paddingHorizontal="18dp"
+            android:singleLine="true"
+            android:imeOptions="actionSearch" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="COMPRESSED APPLICATION MASTER ID (AID)"
-                android:textColor="#475569"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.04"/>
+    </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- POLISHED UX: Removed default value text, reduced size to 16sp, forced single line -->
-            <TextView
-                android:id="@+id/txtFirstCardValue"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textColor="#0284C7"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace"
-                android:layout_marginTop="6dp"
-                android:singleLine="true"
-                android:ellipsize="none"
-                android:gravity="center"/>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
 
-    <!-- 3. Scrollable List Workspace Grid Area -->
+
+
+    <!-- 3. Unified Scroll Workspace Container -->
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginBottom="12dp">
+        android:layout_height="match_parent">
         <LinearLayout
             android:id="@+id/tlvContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"/>
     </ScrollView>
+
 </LinearLayout>
