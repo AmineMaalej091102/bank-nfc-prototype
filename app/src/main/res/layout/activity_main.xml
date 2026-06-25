@@ -5,14 +5,14 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#0F172A"
-    android:padding="20dp">
+    android:padding="16dp">
 
-    <!-- 1. Sensor Status Header -->
+    <!-- 1. VISIBILITY PATCHED: Reduced height slightly to 100dp to optimize space -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/statusCard"
         android:layout_width="match_parent"
         android:layout_height="100dp"
-        app:cardCornerRadius="20dp"
+        app:cardCornerRadius="16dp"
         app:cardBackgroundColor="#1E293B"
         app:strokeWidth="0dp"
         android:layout_marginBottom="12dp">
@@ -20,53 +20,126 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:gravity="center">
-            <TextView android:id="@+id/statusEmoji" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🛰️" android:textSize="24sp" />
-            <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ANTENNA ARMED: HOLD CARD TO BACK" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:gravity="center" android:layout_marginTop="2dp"/>
+            android:gravity="center"
+            android:padding="8dp">
+            <TextView android:id="@+id/statusEmoji" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🛰️" android:textSize="22sp" />
+            <!-- FIXED: Font size increased to 14sp -->
+            <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ANTENNA ARMED: HOLD CARD TO BACK" android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" android:gravity="center" android:layout_marginTop="2dp"/>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 2. HIGH-UX POLISHED MATERIAL SEARCH BOX FILTER LAYER -->
-    <com.google.android.material.textfield.TextInputLayout
+    <!-- 2. Mode Toggle Group Switch Component -->
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/toggleGroup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="20dp"
-        app:endIconMode="clear_text"
-        app:endIconTint="#94A3B8"
-        app:boxStrokeWidth="0dp"
-        app:boxStrokeWidthFocused="0dp"
-        app:hintEnabled="false"
-        app:expandedHintEnabled="false">
-
-        <!-- VISIBILITY OPTIMIZED: Height expanded to 60dp, text enlarged to 15sp for a punchier presence -->
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/searchFilterBar"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:background="@drawable/search_input_background"
-            android:hint="🔍 Search by Tag ID or Name (e.g. 5A, PAN, AID)..."
-            android:textColorHint="#64748B"
+        android:layout_marginBottom="12dp"
+        app:singleSelection="true"
+        app:checkedButton="@id/btnModeTags"
+        app:selectionRequired="true">
+        <!-- THE UX FIX: Forces an instant single-click toggle and prevents unchecking -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeTags"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="📋 Decoded"
             android:textColor="#F8FAFC"
-            android:textSize="15sp"
-            android:paddingHorizontal="18dp"
-            android:singleLine="true"
-            android:imeOptions="actionSearch" />
+            android:textSize="12sp"
+            app:strokeColor="#334155" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeRaw"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="📟 Raw Hex"
+            android:textColor="#F8FAFC"
+            android:textSize="12sp"
+            app:strokeColor="#334155" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
 
-    </com.google.android.material.textfield.TextInputLayout>
-
-
-
-
-    <!-- 3. Unified Scroll Workspace Container -->
-    <ScrollView
+    <!-- ========================================================================= -->
+    <!-- VIEW ZONE A: TAG EXPLORER CONTAINER -->
+    <!-- ========================================================================= -->
+    <LinearLayout
+        android:id="@+id/layoutTagsContainer"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-        <LinearLayout
-            android:id="@+id/tlvContainer"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="visible">
+
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"/>
+            android:layout_marginBottom="12dp"
+            app:endIconMode="clear_text"
+            app:endIconTint="#94A3B8"
+            app:boxStrokeWidth="0dp"
+            app:boxStrokeWidthFocused="0dp"
+            app:hintEnabled="false"
+            app:expandedHintEnabled="false">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchFilterBar"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:background="@drawable/search_input_background"
+                android:hint="🔍 Search by Tag ID or Name..."
+                android:textColorHint="#64748B"
+                android:textColor="#F8FAFC"
+                android:textSize="14sp"
+                android:paddingHorizontal="16dp"
+                android:singleLine="true"
+                android:imeOptions="actionSearch" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- KEYBOARD FIX: Added layout weight and fillViewport to adjust container when keyboard lifts -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+            <LinearLayout
+                android:id="@+id/tlvContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"/>
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- ========================================================================= -->
+    <!-- VIEW ZONE B: RAW TERMINAL HEX DUMP CONTAINER -->
+    <!-- ========================================================================= -->
+    <!-- KEYBOARD FIX: Scaled layout_height to 0dp with weight to compress gracefully on small viewports -->
+    <ScrollView
+        android:id="@+id/layoutRawContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:visibility="gone">
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="14dp"
+            app:cardBackgroundColor="#1E293B"
+            app:strokeWidth="1dp"
+            app:strokeColor="#334155">
+            <!-- FIXED RAW FONT PACK: Increased size to 13sp for crisp terminal readability -->
+            <TextView
+                android:id="@+id/txtRawHexDump"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="14dp"
+                android:text="Waiting for secure radio frequency handshake..."
+                android:fontFamily="monospace"
+                android:textColor="#94A3B8"
+                android:textSize="13sp"
+                android:lineSpacingMultiplier="1.2"
+                android:textIsSelectable="true" />
+        </com.google.android.material.card.MaterialCardView>
     </ScrollView>
 
 </LinearLayout>
