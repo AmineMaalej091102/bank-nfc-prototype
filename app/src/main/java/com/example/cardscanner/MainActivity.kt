@@ -48,19 +48,62 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
 
+        // VISIBILITY & HARDWARE CONTROLLER: Handles single-tap half-duplex states
         toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
-                val isTags = checkedId == R.id.btnModeTags
-                layoutTagsContainer.visibility = if (isTags) View.VISIBLE else View.GONE
-                layoutRawContainer.visibility = if (isTags) View.GONE else View.VISIBLE
+                if (checkedId == R.id.btnModeTags) {
+                    // MODE 1: SCAN MODE ACTIVE (Turn off emulator, turn on scanner antenna)
+                    layoutTagsContainer.visibility = View.VISIBLE
+                    layoutRawContainer.visibility = View.GONE
 
-                // UX STATE COLOR FIX: When switching tabs, dynamically reset the top card back
-                // to its default armed slate gray configuration to clear old state colors
-                statusCard.setCardBackgroundColor(Color.parseColor("#1E293B"))
-                statusEmoji.text = "🛰️"
-                statusText.text = "ANTENNA ARMED: HOLD CARD TO BACK"
+                    // Kill any background emulator service links
+                    try {
+                        val cardEmulation = android.nfc.cardemulation.CardEmulation.getInstance(nfcAdapter ?: return@addOnButtonCheckedListener)
+                        cardEmulation.unsetPreferredService(this)
+                    } catch (e: Exception) {}
+
+                    // Re-arm the 13.56 MHz active polling field antenna
+                    val options = Bundle()
+                    nfcAdapter?.enableReaderMode(
+                        this, this,
+                        NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,
+                        options
+                    )
+
+                    // Reset status layout bar to armed tracking colors
+                    statusCard.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#1E293B"))
+                    statusEmoji.text = "🛰️"
+                    statusText.text = "ANTENNA ARMED: HOLD CARD TO BACK"
+
+                } else {
+                    // MODE 2: REPLAY BROADCAST MODE ACTIVE (Kill scanner field, turn on emulator)
+                    layoutTagsContainer.visibility = View.GONE
+                    layoutRawContainer.visibility = View.VISIBLE
+
+                    // HARD-KILL THE SCANNER FIELD IMMEDIATELY (Prevents half-duplex collision)
+                    nfcAdapter?.disableReaderMode(this)
+
+                    // Wake up your passive card emulation thread and lock system priority to it
+                    try {
+                        val emulatorComponent = android.content.ComponentName(this, MyCardEmulatorService::class.java)
+                        val cardEmulation = android.nfc.cardemulation.CardEmulation.getInstance(nfcAdapter ?: return@addOnButtonCheckedListener)
+
+                        packageManager.setComponentEnabledSetting(
+                            emulatorComponent,
+                            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                            android.content.pm.PackageManager.DONT_KILL_APP
+                        )
+                        cardEmulation.setPreferredService(this, emulatorComponent)
+                    } catch (e: Exception) {}
+
+                    // Shift status layout color scheme to show broadcasting tracking state
+                    statusCard.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#0284C7")) // Blue
+                    statusEmoji.text = "📶"
+                    statusText.text = "BROADCASTING RAW STREAM PAYLOAD FIELD"
+                }
             }
         }
+
 
         searchFilterBar.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -75,13 +118,17 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     override fun onResume() {
         super.onResume()
-        val options = Bundle()
-        nfcAdapter?.enableReaderMode(this, this, NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK, options)
+        // Default to tags view scanning mode on initial application startup
+        toggleGroup.check(R.id.btnModeTags)
     }
 
     override fun onPause() {
         super.onPause()
         nfcAdapter?.disableReaderMode(this)
+        try {
+            val nfc = nfcAdapter ?: return
+            android.nfc.cardemulation.CardEmulation.getInstance(nfc).unsetPreferredService(this)
+        } catch (e: Exception) {}
     }
 
     override fun onTagDiscovered(tag: Tag?) {
@@ -93,7 +140,7 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 statusText.text = "DECODING CORE MULTI-TAG TREES..."
             }
 
-            val result = EmvCardReaderEngine(isoDep).executeDeepScrape()
+            val result = EmvCardReaderEngine(this, isoDep).executeDeepScrape()
             if (result != null) {
                 synchronized(masterDecodedItemsList) {
                     masterDecodedItemsList.clear()

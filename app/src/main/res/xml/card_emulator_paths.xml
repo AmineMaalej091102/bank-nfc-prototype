@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<host-apdu-service xmlns:tools="http://schemas.android.com/tools"
-    xmlns:android="http://android"
-    tools:ignore="NamespaceTypo">
-    android:description="Pure Kotlin Mastercard Emulator Engine"
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/emv_service_description"
     android:requireDeviceUnlock="false">
 
-    <!-- Explicitly mark this service as a financial payment processor card -->
-    <aid-group android:description="Virtual Mastercard Dynamic Profile" android:category="payment">
-        <!-- Mastercard standard Application ID (AID) -->
+    <aid-group
+        android:category="payment"
+        android:description="@string/emv_aid_group_description">
+
         <aid-filter android:name="A0000000041010" />
     </aid-group>
 </host-apdu-service>
