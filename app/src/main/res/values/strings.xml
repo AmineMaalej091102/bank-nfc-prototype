@@ -5,4 +5,6 @@
     <string name="card_network_waiting">Card Network: Waiting...</string>
     <string name="no_data_blocks_parsed_yet">No data blocks parsed yet.</string>
     <string name="reset_core_data">🔄 RESET CORE DATA</string>
+    <string name="emv_service_description">Pure Kotlin Mastercard Emulator Engine</string>
+    <string name="emv_aid_group_description">Virtual Mastercard Dynamic Profile</string>
 </resources>

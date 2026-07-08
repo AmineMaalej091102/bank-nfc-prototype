@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import com.google.android.material.card.MaterialCardView
+import java.util.Locale
 
 class ScannerFragment : Fragment(), NfcAdapter.ReaderCallback {
 
@@ -61,49 +62,32 @@ class ScannerFragment : Fragment(), NfcAdapter.ReaderCallback {
                 scanStatusText.text = "PARSING DATA DO NOT MOVE CARD..."
             }
 
-            val provider = NfcProvider(isoDep)
-            val config = com.github.devnied.emvnfccard.parser.EmvTemplate.Config()
-                .setContactLess(true).setReadAllAids(true)
-            val parser = com.github.devnied.emvnfccard.parser.EmvTemplate.Builder()
-                .setProvider(provider).setConfig(config).build()
+            val result = EmvCardReaderEngine(requireContext(), isoDep).executeDeepScrape()
+            if (result != null) {
+                val prefs = requireActivity().getSharedPreferences(EmvStorage.PREFS_NAME, Context.MODE_PRIVATE)
+                val editor = prefs.edit()
+                editor.clear()
+                editor.putString("HEX_AID", result.hexAid)
 
-            val cardData = parser.readEmvCard()
-            if (cardData != null) {
-                val primaryApp = cardData.applications?.firstOrNull()
-                val hexAid = primaryApp?.aid?.joinToString("") { String.format("%02X", it) } ?: "A0000000041010"
-                val label = primaryApp?.applicationLabel ?: "Contactless Card"
-
-                // Construct dictionary data map for non-literate presentation format
-                val emvDataList = ArrayList<TagItem>()
-                emvDataList.add(TagItem("5A", "Account Card Number", cardData.cardNumber ?: "Unknown"))
-                // Safely capture the separate text properties from the library mapping classes
-                val firstName = cardData.holderFirstname ?: ""
-                val lastName = cardData.holderLastname ?: ""
-
-                // Combine them or provide a high-contrast fallback string if empty
-                val fullCardholderName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
-                    "$firstName $lastName".trim()
-                } else {
-                    "Valued Customer"
+                val leafTags = result.tagsMap.filterKeys { !EmvTlvRules.isConstructed(it) }
+                for ((tag, value) in leafTags) {
+                    editor.putString("TAG_$tag", value)
                 }
+                for ((key, value) in result.apduPayloads) {
+                    editor.putString(key, value)
+                }
+                editor.commit()
 
-                // Inject the corrected string value safely back into Tag 5F20 layout row
-                emvDataList.add(TagItem("5F20", "Cardholder Name", fullCardholderName))
-                emvDataList.add(TagItem("5F24", "Expiration Date", cardData.expireDate?.let { java.text.SimpleDateFormat("MM/yy").format(it) } ?: "••/••"))
-                emvDataList.add(TagItem("4F", "Application Identifier", hexAid))
-                emvDataList.add(TagItem("50", "Card Network Label", label))
-                emvDataList.add(TagItem("82", "Application Interchange Profile (AIP)", "0080 (Contactless Standard Protocol Optimized)"))
-                emvDataList.add(TagItem("9F06", "Terminal Authorized AID Application", hexAid))
-
-                // Cache elements to memory for immediate HCE Emulation handling
-                val prefs = requireActivity().getSharedPreferences("EMV_Payload_Cache", Context.MODE_PRIVATE)
-                prefs.edit().putString("HEX_AID", hexAid).putString("TAG_5A", cardData.cardNumber?.replace(" ", "") ?: "").apply()
+                val emvDataList = ArrayList<TagItem>()
+                for ((tag, value) in leafTags.entries.sortedBy { it.key }) {
+                    emvDataList.add(TagItem(tag, EmvDictionary.getDescription(tag), value))
+                }
 
                 activity?.runOnUiThread {
                     scanStatusCard.setCardBackgroundColor(Color.parseColor("#16A34A")) // Success Green
                     scanEmoji.text = "✅"
                     scanStatusText.text = "CARD DECODED SUCCESSFULLY!"
-                    lblHexAid.text = "0x$hexAid"
+                    lblHexAid.text = "0x${result.hexAid}"
 
                     // Dynamically build and inject beautiful high-contrast UI view rows
                     tlvContainer.removeAllViews()
@@ -136,3 +120,9 @@ class ScannerFragment : Fragment(), NfcAdapter.ReaderCallback {
 
 // Lightweight custom layout structure container definition
 data class TagItem(val code: String, val description: String, val value: String)
+
+object EmvTlvRules {
+    private val constructedTags = setOf("6F", "70", "77", "A5", "61", "BF0C")
+
+    fun isConstructed(tag: String): Boolean = tag.uppercase(Locale.US) in constructedTags
+}

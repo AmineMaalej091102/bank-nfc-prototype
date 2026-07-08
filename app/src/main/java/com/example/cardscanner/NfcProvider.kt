@@ -24,7 +24,7 @@ class NfcProvider(private val isoDep: IsoDep) : IProvider {
 
     override fun getAt(): ByteArray {
         return try {
-            isoDep.historicalBytes ?: byteArrayOf()
+            isoDep.historicalBytes ?: isoDep.hiLayerResponse ?: byteArrayOf()
         } catch (e: Exception) {
             byteArrayOf()
         }

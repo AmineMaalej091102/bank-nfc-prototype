@@ -22,7 +22,7 @@ class EmulatorFragment : Fragment() {
         refreshDisplayData()
 
         btnWipeData.setOnClickListener {
-            val prefs = requireActivity().getSharedPreferences("EMV_Payload_Cache", Context.MODE_PRIVATE)
+            val prefs = requireActivity().getSharedPreferences(EmvStorage.PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().clear().apply()
             refreshDisplayData()
         }
@@ -31,7 +31,7 @@ class EmulatorFragment : Fragment() {
     }
 
     private fun refreshDisplayData() {
-        val prefs = requireActivity().getSharedPreferences("EMV_Payload_Cache", Context.MODE_PRIVATE)
+        val prefs = requireActivity().getSharedPreferences(EmvStorage.PREFS_NAME, Context.MODE_PRIVATE)
         val savedAid = prefs.getString("HEX_AID", null)
         val savedPan = prefs.getString("TAG_5A", null)
 
